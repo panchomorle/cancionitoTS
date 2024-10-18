@@ -14,7 +14,7 @@
   "dependencies": {
     "@builderbot/bot": "1.2.2",
     "@builderbot/provider-baileys": "1.2.2",
-    "sharp": "^0.33.5"
+    "axios": "^1.7.7"
   },
   "devDependencies": {
     "@types/node": "^20.11.30",
