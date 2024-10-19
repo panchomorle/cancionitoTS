@@ -39,8 +39,19 @@ const suggestSongs = async () => {
     return suggestions;
 };
 
+const normalizeText = (text) => {
+    return text
+        .toLowerCase() // Convertir a minúsculas
+        .normalize('NFD') // Descomponer caracteres con tildes
+        .replace(/[\u0300-\u036f]/g, "") // Eliminar tildes
+        .replace(/[^a-z0-9\s]/g, "") // Eliminar caracteres especiales
+        .trim(); // Quitar espacios al inicio y al final
+};
+
+//////////////---------FLUJOS---------//////////////
+
 // Flujo para salir
-const flowSalir = addKeyword<Provider, Database>(['salir']).
+const flowSalir = addKeyword<Provider, Database>(['salir', 'chau', 'adios', 'adiós', 'hasta pronto', 'hasta luego']).
 addAnswer('¡Hasta luego! 👋');
 
 const flowMenu = addKeyword<Provider, Database>(["menu", "no"])
@@ -79,9 +90,9 @@ const flowPostRandom = addKeyword<Provider, Database>("random")
 
 const flowBuscar = addKeyword<Provider, Database>(["buscar", "si"])
 .addAnswer('Escribe el nombre de la canción que quieres buscar:', { capture: true }, async (ctx, { flowDynamic, gotoFlow, provider }) => {
-    const userMessage = ctx.body.trim().toLowerCase();
+    const userMessage = normalizeText(ctx.body);
     const songs = await getSongs();
-    const matchingSong = songs.find(song => song.title.toLowerCase().includes(userMessage));
+    const matchingSong = songs.find(song => song.title.includes(userMessage));
 
     if (matchingSong) {
         const images = await getSongImages(matchingSong.id);
@@ -119,11 +130,11 @@ const flowPostSugerencias = addKeyword<Provider, Database>("sugerencias")
 
 
 // Flujo de saludo principal
-const flowSaludo = addKeyword<Provider, Database>(['hola', 'hi', 'hello'])
+const flowSaludo = addKeyword<Provider, Database>(['hola', 'hi', 'hello', 'hey', 'buenas', 'que onda', 'que tal', 'saludos', 'como estás'])
     .addAnswer('¡Hola! Soy CancioNito, tu bot musical.')
     .addAnswer('Puedes escribir "random" para una canción aleatoria, "buscar" para buscar canciones, o "sugerencias" para recibir recomendaciones.',
         null,
-        null, [flowRandom, flowBuscar, flowSugerencias]);
+        null, [flowRandom, flowBuscar, flowSugerencias, flowSalir]);
 
 // Crear el bot
 const main = async () => {
