@@ -48,14 +48,50 @@ const normalizeText = (text) => {
         .trim(); // Quitar espacios al inicio y al final
 };
 
+const calculateDistance = (a, b) => {
+    const matrix = []; // defino matriz para ejecutar el algoritmo de Levenshtein
+
+    // Incrementa por una línea en la fila cero
+    for (let i = 0; i <= b.length; i++) {
+        matrix[i] = [i];
+    }
+
+    // Incrementa por una línea en la columna cero
+    for (let j = 0; j <= a.length; j++) {
+        matrix[0][j] = j;
+    }
+
+    // Completar la matriz
+    for (let i = 1; i <= b.length; i++) {
+        for (let j = 1; j <= a.length; j++) {
+            if (b.charAt(i - 1) === a.charAt(j - 1)) {
+                matrix[i][j] = matrix[i - 1][j - 1];
+            } else {
+                matrix[i][j] = Math.min(
+                    matrix[i - 1][j - 1] + 1, // Sustitución
+                    matrix[i][j - 1] + 1,     // Inserción
+                    matrix[i - 1][j] + 1      // Eliminación
+                );
+            }
+        }
+    }
+    const distance = matrix[b.length][a.length];
+    const maxLength = Math.max(a.length, b.length);
+    return ((maxLength - distance) / maxLength) * 100;
+}
+
 //////////////---------FLUJOS---------//////////////
 
 // Flujo para salir
 const flowSalir = addKeyword<Provider, Database>(['salir', 'chau', 'adios', 'adiós', 'hasta pronto', 'hasta luego']).
 addAnswer('¡Hasta luego! 👋');
 
-const flowMenu = addKeyword<Provider, Database>(["menu", "no"])
-.addAnswer(['----MENU----', 'Escribe "random" para una canción aleatoria, "buscar" para buscar canciones, "sugerencias" para recibir recomendaciones o "salir" para salir.'],
+const flowMenu = addKeyword<Provider, Database>(["menu", "no", "menú"])
+.addAnswer(['🎙️🔸🔸🔸➡️MENÚ⬅️🔸🔸🔸🎙️',
+    "👉Pedir una canción (escribe 'buscar')" +
+    "\n 👉Sugerencias de canciones (escribe 'sugerencias')" +
+    "\n 👉Canción aleatoria (escribe 'random')" +
+    "\n ❌Terminar conversación (escribe 'salir')"],
     { capture: true }, async (ctx, { gotoFlow }) => {
         const message = ctx.body.toLowerCase();
         if (message === 'random') return gotoFlow(flowRandom);
@@ -105,8 +141,20 @@ const flowBuscar = addKeyword<Provider, Database>(["buscar", "si"])
         } else {
             await flowDynamic([{ body: "Lo siento, no encontré imágenes para esta canción." }]);
         }
-    } else {
-        await flowDynamic([{ body: "Lo siento, no encontré ninguna canción con ese título." }]);
+    }
+    else{
+        // Calcular coincidencia para cada canción y filtrar las que superen el umbral (50%)
+        const matches = songs.filter(song => {
+            const matchPercentage = calculateDistance(userMessage, song.title);
+            return matchPercentage >= 70;
+        });
+        if (matches.length > 0) {
+            const matchText = matches.map(song => song.title).join('\n- ');
+            await flowDynamic([{ body: `No encontré la canción exacta, pero tal vez quisiste decir:\n- ${matchText}` }]);
+        }
+        else{
+            await flowDynamic([{ body: "Lo siento, no encontré ninguna canción con ese título." }]);
+        }
     }
     return gotoFlow(flowPostBuscar); // Redirige de vuelta a este flujo para buscar otra canción
 });
@@ -115,7 +163,7 @@ const flowPostBuscar = addKeyword<Provider, Database>(['buscar'])
 .addAnswer('¿Quieres seguir buscando? Escribe "si" para buscar otra, o "no" para volver al menú.', null, null, [flowBuscar, flowMenu]);
 
 // Flujo para sugerencias
-const flowSugerencias = addKeyword<Provider, Database>(['sugerencias', 'recomendaciones', 'sugerir', 'sugerencia', 'mas'])
+const flowSugerencias = addKeyword<Provider, Database>(['sugerencias', 'recomendaciones', 'sugerir', 'sugerencia', 'mas', 'más'])
     .addAction(async (ctx, { flowDynamic, gotoFlow }) => {
         const suggestions = await suggestSongs();
 
@@ -131,8 +179,11 @@ const flowPostSugerencias = addKeyword<Provider, Database>("sugerencias")
 
 // Flujo de saludo principal
 const flowSaludo = addKeyword<Provider, Database>(['hola', 'hi', 'hello', 'hey', 'buenas', 'que onda', 'que tal', 'saludos', 'como estás'])
-    .addAnswer('¡Hola! Soy CancioNito, tu bot musical.')
-    .addAnswer('Puedes escribir "random" para una canción aleatoria, "buscar" para buscar canciones, o "sugerencias" para recibir recomendaciones.',
+    .addAnswer("¡Hola! Soy *CancioNito* 🎵, ¿qué te gustaría hacer?")
+    .addAnswer("👉Pedir una canción (escribe 'buscar')" +
+        "\n 👉Sugerencias de canciones (escribe 'sugerencias')" +
+        "\n 👉Canción aleatoria (escribe 'random')" +
+        "\n ❌Terminar conversación (escribe 'salir')",
         null,
         null, [flowRandom, flowBuscar, flowSugerencias, flowSalir]);
 
