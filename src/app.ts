@@ -1,99 +1,8 @@
 import { createBot, createProvider, createFlow, addKeyword, addAnswer } from '@builderbot/bot';
 import { BaileysProvider as Provider } from '@builderbot/provider-baileys';
 import { MemoryDB as Database } from '@builderbot/bot';
-import axios from 'axios';
-
-const MENU_TEXT = "👉Pedir una canción (escribe 'buscar')" +
-"\n 👉Sugerencias de canciones (escribe 'sugerencias')" +
-"\n 👉Canción aleatoria (escribe 'random')" +
-"\n ℹ️ Información / Tutorial (escribe 'info')"+
-"\n ❌Terminar conversación (escribe 'salir')";
-
-const INFO_TEXT = "    ℹ️ INFO ℹ️    "+
-"\nCréditos:\n- J.P. Morales Zaragoza\n- A. Block Ernst\n- A. Quiroz Menor"+
-"\n\n*TUTORIAL:*"+
-"\n- A CancioNito le gusta que le digan las cosas con paciencia, en *mensajes separados*. Por eso, escribe *mensajes cortos* como: 'hola', 'buscar'."+
-"\n\n- CancioNito te preguntará luego de cada paso qué quieres hacer y con qué *palabras clave*, por favor, lee atentamente sus indicaciones."+
-'\n\n- NO escribas algo como "buscar cancion cristo joven". CancioNito NO es una IA y *debes seguir una serie de pasos* para usarlo.'+
-"\n\n- CancioNito *entenderá* tanto con MAYUSCULAS como ᵐᶦⁿᵘˢᶜᵘˡᵃˢ, tampoco le importa si escribes con tildes o sin ellas, está *programado para entenderte* igual! ;)"+
-"\n\n- Si encuentras errores *contáctate* con los desarrolladores por instagram: @cancionito, o por mail: badrithm@hotmail.com";
-
-const getSongs = async () => {
-    try {
-        const response = await axios.get('https://cancionito-net.onrender.com/api/songs');
-        return response.data;
-    } catch (error) {
-        console.error('Error al obtener canciones:', error);
-        return [];
-    }
-};
-const getSongImages = async (id) => {
-    try {
-        const response = await axios.get(`https://cancionito-net.onrender.com/api/songs/${id}/images`);
-        return response.data;
-    } catch (error) {
-        console.error('Error al obtener imágenes:', error);
-        return [];
-    }
-};
-
-// Función para sugerir 3 canciones aleatorias
-const suggestSongs = async () => {
-    const songs = await getSongs();
-    const suggestions = [];
-    
-    if (songs.length === 0) {
-        return ['No hay canciones disponibles en este momento.'];
-    }
-
-    for (let i = 0; i < 3; i++) {
-        const randomIndex = Math.floor(Math.random() * songs.length);
-        suggestions.push(songs[randomIndex].title); // Aquí accedemos directamente al título
-    }
-    
-    return suggestions;
-};
-
-const normalizeText = (text) => {
-    return text
-        .toLowerCase() // Convertir a minúsculas
-        .normalize('NFD') // Descomponer caracteres con tildes
-        .replace(/[\u0300-\u036f]/g, "") // Eliminar tildes
-        .replace(/[^a-z0-9\s]/g, "") // Eliminar caracteres especiales
-        .trim(); // Quitar espacios al inicio y al final
-};
-
-const calculateDistance = (a, b) => {
-    const matrix = []; // defino matriz para ejecutar el algoritmo de Levenshtein
-
-    // Incrementa por una línea en la fila cero
-    for (let i = 0; i <= b.length; i++) {
-        matrix[i] = [i];
-    }
-
-    // Incrementa por una línea en la columna cero
-    for (let j = 0; j <= a.length; j++) {
-        matrix[0][j] = j;
-    }
-
-    // Completar la matriz
-    for (let i = 1; i <= b.length; i++) {
-        for (let j = 1; j <= a.length; j++) {
-            if (b.charAt(i - 1) === a.charAt(j - 1)) {
-                matrix[i][j] = matrix[i - 1][j - 1];
-            } else {
-                matrix[i][j] = Math.min(
-                    matrix[i - 1][j - 1] + 1, // Sustitución
-                    matrix[i][j - 1] + 1,     // Inserción
-                    matrix[i - 1][j] + 1      // Eliminación
-                );
-            }
-        }
-    }
-    const distance = matrix[b.length][a.length];
-    const maxLength = Math.max(a.length, b.length);
-    return ((maxLength - distance) / maxLength) * 100;
-}
+import { MENU_TEXT, INFO_TEXT, WAITING_TEXT } from './constants';
+import { getSongs, getSongImages, suggestSongs, calculateDistance, normalizeText } from './services';
 
 //////////////---------FLUJOS---------//////////////
 
@@ -121,7 +30,7 @@ const flowPostInfo = addKeyword<Provider, Database>("info")
 // Flujo para canción aleatoria
 const flowRandom = addKeyword<Provider, Database>(['random', 'aleatoria', 'canción aleatoria', 'otra'])
     .addAction(async (ctx, { flowDynamic, provider, gotoFlow }) => {
-        await flowDynamic([{ body: "Bancáme un cachito que busco..." }]);
+        await flowDynamic([{ body: WAITING_TEXT }]);
         try {
             const randomSongs = await getSongs();
             //si el fetch de la lista de canciones falló (vino vacío)
@@ -135,12 +44,15 @@ const flowRandom = addKeyword<Provider, Database>(['random', 'aleatoria', 'canci
 
             //traemos las imágenes de la canción elegida
             const images = await getSongImages(randomSong.id);
-            //si la canción no contiene imagenes
-            if (images.length > 0) {
+            //si la canción contiene imagenes
+            if (images.length > 0)
+            {
                 for (const image of images) {
                     await provider.sendImage(ctx.from + '@s.whatsapp.net', image.url, "");
                 }
-            } else {
+            }
+            else //si no contiene imagenes
+            {
                 await flowDynamic([{ body: "Lo siento, no encontré imágenes para esta canción." }]);
             }
         } catch (error) {
@@ -155,9 +67,9 @@ const flowPostRandom = addKeyword<Provider, Database>("random")
 
 // Flujo para buscar una canción
 
-const flowBuscar = addKeyword<Provider, Database>(["buscar", "si"])
+const flowBuscar = addKeyword<Provider, Database>(["pedir", "buscar", "si"])
 .addAnswer('Escribe el nombre de la canción que quieres buscar:', { capture: true }, async (ctx, { flowDynamic, gotoFlow, provider }) => {
-    await flowDynamic([{ body: "Bancáme un cachito que busco..." }]);
+    await flowDynamic([{ body: WAITING_TEXT }]);
     const userMessage = normalizeText(ctx.body);
     
     try{
@@ -190,10 +102,31 @@ const flowBuscar = addKeyword<Provider, Database>(["buscar", "si"])
                 const matchPercentage = calculateDistance(userMessage, song.title);
                 return matchPercentage >= 70;
             });
-            if (matches.length > 0) {
+            
+            //se encontró 1 solo match probable, se mandan sus imagenes
+            if (matches.length === 1) {
+                const images = await getSongImages(matches[0].id);
+                await flowDynamic([{ body: `¡Encontré la canción que buscas! 🎶\nTítulo: ${matches[0].title}` }]);
+
+                if (images.length > 0) {
+                    try {
+                        for (const image of images) {
+                            await provider.sendImage(ctx.from + '@s.whatsapp.net', image.url, "");
+                        }
+                    } catch (error) {
+                        console.error('Error: ', error);
+                        await flowDynamic([{ body: "Hubo un error al envíarte las imágenes :(\nSi el error persiste, contacta a mis desarrolladores vía mail: badrithm@hotmail.com" }]);
+                    }
+                } else {
+                    await flowDynamic([{ body: "Lo siento, no encontré imágenes para esta canción." }]);
+                }
+            }
+            //se encontró más de un match probable, se listan los matches
+            else if (matches.length > 1) {
                 const matchText = matches.map(song => song.title).join('\n- ');
                 await flowDynamic([{ body: `No encontré la canción exacta, pero tal vez quisiste decir:\n- ${matchText}` }]);
             }
+            //no se encontraron matches.
             else{
                 await flowDynamic([{ body: "Lo siento, no encontré ninguna canción con ese título." }]);
             }
@@ -201,7 +134,7 @@ const flowBuscar = addKeyword<Provider, Database>(["buscar", "si"])
     }
     catch(error){
         console.error(error);
-        await flowDynamic([{ body: "Tuve un error interno, volvé a intentar :c" }]);
+        await flowDynamic([{ body: "Tuve un error interno, porfa volvé a intentar :c" }]);
     }
     return gotoFlow(flowPostBuscar); // Redirige de vuelta a este flujo para buscar otra canción
 });
@@ -212,6 +145,7 @@ const flowPostBuscar = addKeyword<Provider, Database>(['buscar'])
 // Flujo para sugerencias
 const flowSugerencias = addKeyword<Provider, Database>(['sugerencias', 'recomendaciones', 'sugerir', 'sugerencia', 'mas', 'más'])
     .addAction(async (ctx, { flowDynamic, gotoFlow }) => {
+        await flowDynamic([{ body: WAITING_TEXT }]);
         const suggestions = await suggestSongs();
 
         const suggestionText = suggestions.map((song, index) => `${index + 1}. ${song}`).join('\n'); // `song` ya es el título
@@ -221,7 +155,7 @@ const flowSugerencias = addKeyword<Provider, Database>(['sugerencias', 'recomend
     });
 
 const flowPostSugerencias = addKeyword<Provider, Database>("sugerencias")
-.addAnswer('Escribe "más" para ver más sugerencias, o "menu" para volver al menú.', null, null, [flowSugerencias, flowMenu]);
+.addAnswer('Escribe *"más"* para ver más sugerencias, *"buscar"* para comenzar a buscar imágenes o *"menu"* para volver al menú.', null, null, [flowSugerencias, flowMenu, flowBuscar]);
 
 
 // Flujo de saludo principal
