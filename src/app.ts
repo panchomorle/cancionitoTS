@@ -3,6 +3,7 @@ import { BaileysProvider as Provider } from '@builderbot/provider-baileys';
 import { MemoryDB as Database } from '@builderbot/bot';
 import { MENU_TEXT, INFO_TEXT, WAITING_TEXT } from './constants';
 import { getSongs, getSongImages, suggestSongs, calculateDistance, normalizeText } from './services';
+import http from 'http';
 
 //////////////---------FLUJOS---------//////////////
 
@@ -178,6 +179,24 @@ const main = async () => {
     });
 
     httpServer(3000);
+
+    // Crear un servidor HTTP adicional para el endpoint de UptimeRobot
+    const keepAliveServer = http.createServer((req, res) => {
+        if (req.method === 'GET' && req.url === '/') {
+            res.writeHead(200, { 'Content-Type': 'text/plain' });
+            res.end('Bot is running!');
+        } else {
+            res.writeHead(404, { 'Content-Type': 'text/plain' });
+            res.end('Not Found');
+        }
+    });
+
+    // Escucha en un puerto secundario o en el mismo si es seguro
+    const KEEP_ALIVE_PORT = 3001; // Usar un puerto diferente al principal
+    keepAliveServer.listen(KEEP_ALIVE_PORT, () => {
+        console.log(`Keep-alive server is running on port ${KEEP_ALIVE_PORT}`);
+    });
+
 };
 
 main();
