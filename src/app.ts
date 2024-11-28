@@ -178,25 +178,23 @@ const main = async () => {
         database: adapterDB,
     });
 
+    // Levantar el servidor del bot en el puerto 3000
     httpServer(3000);
 
-    // Crear un servidor HTTP adicional para el endpoint de UptimeRobot
-    const keepAliveServer = http.createServer((req, res) => {
-        if (req.method === 'GET' && req.url === '/') {
+    // Crear un servidor HTTP adicional usando el mismo puerto
+    const server = http.createServer((req, res) => {
+        if (req.method === 'GET' && req.url === '/UptimeRobot') {
+            // Responder a las solicitudes de UptimeRobot
             res.writeHead(200, { 'Content-Type': 'text/plain' });
             res.end('Bot is running!');
-        } else {
-            res.writeHead(404, { 'Content-Type': 'text/plain' });
-            res.end('Not Found');
         }
     });
 
-    // Escucha en un puerto secundario o en el mismo si es seguro
-    const KEEP_ALIVE_PORT = 3001; // Usar un puerto diferente al principal
-    keepAliveServer.listen(KEEP_ALIVE_PORT, () => {
-        console.log(`Keep-alive server is running on port ${KEEP_ALIVE_PORT}`);
+    // Reutilizar el puerto ya configurado
+    const PORT = process.env.PORT || 3000;
+    server.listen(PORT, () => {
+        console.log(`UptimeRobot endpoint running on port ${PORT}`);
     });
-
 };
 
 main();
