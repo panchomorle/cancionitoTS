@@ -178,22 +178,23 @@ const main = async () => {
         database: adapterDB,
     });
 
-    // Levantar el servidor del bot en el puerto 3000
-    httpServer(3000);
+    // Levantar el servidor principal en el puerto 3000
+    const PORT: number = 3000;
 
-    // Crear un servidor HTTP adicional usando el mismo puerto
+    // Usar el mismo servidor para manejar el endpoint de UptimeRobot
     const server = http.createServer((req, res) => {
-        if (req.method === 'GET' && req.url === '/UptimeRobot') {
-            // Responder a las solicitudes de UptimeRobot
+        if (req.method === 'GET' && req.url === '/') {
+            // Endpoint raíz para UptimeRobot
             res.writeHead(200, { 'Content-Type': 'text/plain' });
             res.end('Bot is running!');
+        } else if (req.method === 'GET' && req.url === '/qr') {
+            // Pasar las demás solicitudes al servidor del bot
+            httpServer(PORT); // Reutilizamos la lógica de httpServer
         }
     });
 
-    // Reutilizar el puerto ya configurado
-    const PORT = process.env.PORT || 3000;
     server.listen(PORT, () => {
-        console.log(`UptimeRobot endpoint running on port ${PORT}`);
+        console.log(`Server is running on port ${PORT}`);
     });
 };
 
